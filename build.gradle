@@ -1,0 +1,279 @@
+buildscript {
+    repositories {
+        maven { url = 'https://maven.minecraftforge.net' }
+        maven { url = 'https://repo.spongepowered.org/maven' }
+        maven { url = 'https://maven.parchmentmc.org' }
+        mavenCentral()
+    }
+    dependencies {
+        classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '5.1.+', changing: true
+        classpath 'org.spongepowered:mixingradle:0.7-SNAPSHOT'
+    }
+}
+
+plugins {
+    id 'eclipse'
+    id 'idea'
+    id 'maven-publish'
+    id 'net.minecraftforge.gradle' version '5.1+'
+    id 'org.parchmentmc.librarian.forgegradle' version '1.+'
+}
+apply plugin: 'org.spongepowered.mixin'
+
+version = mod_version
+group = mod_group_id
+archivesBaseName = mod_id
+
+// Mojang ships Java 17 to end users in 1.19.2, so mods should target Java 17.
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+minecraft {
+    mappings channel: 'parchment', version: "${parchment_mappings_version}-${parchment_minecraft_version}"
+
+    accessTransformer = file('src/main/resources/META-INF/accesstransformer.cfg')
+
+    runs {
+        client {
+            workingDirectory project.file('run')
+
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+            property 'forge.enabledGameTestNamespaces', project.mod_id
+
+            mods {
+                "${mod_id}" {
+                    source sourceSets.main
+                }
+            }
+        }
+
+        server {
+            workingDirectory project.file('run')
+
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+            property 'forge.enabledGameTestNamespaces', project.mod_id
+            args '--nogui'
+
+            mods {
+                "${mod_id}" {
+                    source sourceSets.main
+                }
+            }
+        }
+
+        data {
+            workingDirectory project.file('run-data')
+
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+
+            args '--mod', project.mod_id, '--all', '--output', file('src/generated/resources/').getAbsolutePath(), '--existing', file('src/main/resources/').getAbsolutePath()
+
+            mods {
+                "${mod_id}" {
+                    source sourceSets.main
+                }
+            }
+        }
+    }
+}
+
+mixin {
+    add sourceSets.main, "${mod_id}.refmap.json"
+
+    config "${mod_id}.core.mixins.json"
+    config "${mod_id}.feature.entities.mixins.json"
+    config "${mod_id}.feature.modelparts.mixins.json"
+    config "${mod_id}.feature.geckolib.mixins.json"
+    config "${mod_id}.compat.sodium.mixins.json"
+    config "${mod_id}.compat.iris.mixins.json"
+}
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = "Modrinth"
+                url = "https://api.modrinth.com/maven"
+            }
+        }
+        filter {
+            includeGroup "maven.modrinth"
+        }
+    }
+
+    maven {
+        url 'https://jitpack.io'
+        content {
+            includeGroup "com.github.TartaricAcid"
+        }
+    }
+
+    maven {
+        url "https://cursemaven.com"
+        content {
+            includeGroup "curse.maven"
+        }
+    }
+
+    maven {
+        name = 'Fabric'
+        url = 'https://maven.fabricmc.net/'
+    }
+
+    flatDir {
+        dir 'libs'
+    }
+}
+
+dependencies {
+    minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+
+    // STAGE 1 (quarantine) — third-party mods are excluded from source and disabled here. They are
+    // re-enabled (with their correct 1.19.2 curse.maven coordinates) as each compat is ported.
+    // mixinextras-forge is provided via the jarJar below (no fg.deobf needed).
+    // STAGE 1 (quarantine): these compat mods' 1.19.2 APIs differ from 1.20.1, and their deobf'd
+    // artifacts cannot be resolved via Modrinth maven under ForgeGradle 5. They are excluded from
+    // compilation below; re-add one-by-one (as curse.maven with the correct 1.19.2 fileId) as each
+    // compat is actually ported.
+    // STAGE 2: re-enabled compat deps with confirmed 1.19.2 CurseForge coords.
+    // rubidium (Sodium for Forge) mc1.19.2-0.6.2c
+    implementation fg.deobf("curse.maven:rubidium-574856:4763255")
+    implementation fg.deobf("curse.maven:modern-ui-352491:5229370")
+    implementation fg.deobf("curse.maven:oculus-581495:6020961")
+    compileOnly fg.deobf("curse.maven:create-328085:5689513")
+    compileOnly fg.deobf("curse.maven:curios-309927:4418023")
+
+    // STAGE 3: compat deps supplied via CurseForge Maven snippets (fileIds from user).
+    implementation fg.deobf("curse.maven:entity-texture-features-fabric-568563:5300624")   // ETF (Entity Texture Features)
+    implementation fg.deobf("curse.maven:entity-model-features-844662:5304249")            // EMF
+    implementation fg.deobf("curse.maven:geckolib-388172:4407241")
+    implementation fg.deobf("curse.maven:touhou-little-maid-355044:6440564")  // Touhou Little Maid
+    implementation fg.deobf("curse.maven:sophisticated-core-618298:5870031")
+    implementation fg.deobf("curse.maven:immediatelyfast-686911:6312263")
+    implementation fg.deobf("curse.maven:ftb-library-forge-404465:8230545")  // FTB Library Forge (1.19.2)
+    implementation fg.deobf("curse.maven:modern-ui-352491:5229370")
+    implementation fg.deobf("curse.maven:architectury-api-419699:5137942")
+
+    // TODO(1.19.2): Configured has a 1.19.2 release (2.1.1).
+    // Replace <fileId> with the CurseForge numeric file id for that release, then uncomment.
+    // runtimeOnly fg.deobf("curse.maven:configured-457570:<fileId>")
+
+    // MixinExtras: put on compile classpath + annotation processor path, and shade (jarJar) into the jar.
+    compileOnly(annotationProcessor("io.github.llamalad7:mixinextras-common:0.5.0"))
+    implementation(jarJar("io.github.llamalad7:mixinextras-forge:0.5.0")) {
+        jarJar.ranged(it, "[0.5.0,)")
+    }
+
+    compileOnly "org.projectlombok:lombok:1.18.38"
+    // The Mixin AP needs the main mixin jar on the compile classpath to resolve
+    // annotation types (e.g. org.spongepowered.asm.mixin.injection.Slice). Forge
+    // supplies Mixin at runtime, so this is compileOnly (never bundled).
+    compileOnly "org.spongepowered:mixin:0.8.7"
+    // 1.19.2 MC does not bundle org.joml (it uses com.mojang.math.* instead), but this mod's pipeline
+    // and Mixin interfaces are built on org.joml. Provide it at compile AND runtime.
+    implementation "org.joml:joml:1.10.5"
+    // Bundle org.joml into the packaged jar too: 1.19.2 MC doesn't ship it, so the distributed mod
+    // jar must inline it (otherwise a real-Forge install throws ClassNotFoundException/ClassMetadata
+    // NotFoundException: org.joml.Matrix4f). This is purely for packaging; the dev runClient fix above
+    // (appending org.joml to the ModLauncher legacy classpath) is separate and stays in place.
+    jarJar("org.joml:joml:1.10.5") {
+        jarJar.ranged(it, "[1.10.5,)")
+    }
+    annotationProcessor "org.projectlombok:lombok:1.18.38"
+    annotationProcessor 'org.spongepowered:mixin:0.8.7:processor'
+}
+
+// Include resources generated by data generators.
+sourceSets.main.resources { srcDir 'src/generated/resources' }
+
+// FG5 dev run: the ModLauncher app classloader is built from the "legacy classpath" file
+// (-DlegacyClassPath.file), which only lists Minecraft + libraries. Plain implementation libs
+// (org.joml, mixinextras-forge) are put on the JVM classpath but NOT in that file, so Mixin can't
+// resolve org.joml.Matrix4f and crashes with ClassMetadataNotFoundException. Append those non-mod
+// runtime libraries back into the legacy classpath file right before the run launches.
+tasks.configureEach {
+    if (name == 'runClient') {
+        doFirst {
+            def legacyFile = file('build/classpath/runClient_minecraftClasspath.txt')
+            if (legacyFile.exists()) {
+                def items = legacyFile.readLines() as LinkedHashSet
+                def extra = configurations.runtimeClasspath.files.findAll { jar ->
+                    // Only plain (non-JPMS-module) libraries: org.joml. Do NOT append JPMS modules
+                    // like mixinextras-forge — they already live on the module path and would cause
+                    // "Module forge reads more than one module named '<name>'" conflicts.
+                    jar.name.contains('joml')
+                }
+                extra.each { jar -> items << jar.absolutePath }
+                if (extra.size() > 0) {
+                    legacyFile.write(items.join(System.lineSeparator()))
+                }
+            }
+        }
+    }
+}
+
+// All source is compiled from now on. Compat/feature packages that are still 1.20.1-only
+// are being ported to 1.19.2 incrementally; compile errors there are expected while we work
+// through them package-by-package.
+
+jar {
+    manifest.attributes([
+            "MixinConfigs": "${mod_id}.core.mixins.json," +
+                    "${mod_id}.feature.entities.mixins.json," +
+                    "${mod_id}.feature.modelparts.mixins.json," +
+                    "${mod_id}.feature.geckolib.mixins.json," +
+                    "${mod_id}.compat.sodium.mixins.json," +
+                    "${mod_id}.compat.iris.mixins.json"
+    ])
+}
+
+// Expands ${...} placeholders in src/main/templates into generated mod metadata.
+var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
+    var replaceProperties = [
+            minecraft_version        : minecraft_version,
+            minecraft_version_range  : minecraft_version_range,
+            forge_version            : forge_version,
+            forge_version_range      : forge_version_range,
+            loader_version_range     : loader_version_range,
+            mod_id                   : mod_id,
+            mod_name                 : mod_name,
+            mod_license              : mod_license,
+            mod_version              : mod_version,
+            mod_authors              : mod_authors,
+            mod_description          : mod_description
+    ]
+    inputs.properties replaceProperties
+    expand replaceProperties
+    from "src/main/templates"
+    into "build/generated/sources/modMetadata"
+}
+sourceSets.main.resources.srcDir generateModMetadata
+
+publishing {
+    publications {
+        register('mavenJava', MavenPublication) {
+            from components.java
+        }
+    }
+    repositories {
+        maven {
+            url "file://${project.projectDir}/repo"
+        }
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+idea {
+    module {
+        downloadSources = true
+        downloadJavadoc = true
+    }
+}

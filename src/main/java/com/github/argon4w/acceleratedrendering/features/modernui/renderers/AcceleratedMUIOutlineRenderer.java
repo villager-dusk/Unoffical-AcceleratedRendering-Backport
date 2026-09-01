@@ -1,0 +1,81 @@
+package com.github.argon4w.acceleratedrendering.features.modernui.renderers;
+
+import com.github.argon4w.acceleratedrendering.core.buffers.accelerated.builders.VertexConsumerExtension;
+import com.github.argon4w.acceleratedrendering.core.buffers.accelerated.renderers.IAcceleratedRenderer;
+import com.mojang.blaze3d.vertex.VertexConsumer;
+import icyllis.modernui.graphics.font.BakedGlyph;
+import lombok.experimental.ExtensionMethod;
+import net.minecraft.util.FastColor;
+import org.joml.Matrix3f;
+import org.joml.Matrix4f;
+
+@ExtensionMethod(VertexConsumerExtension.class)
+public class AcceleratedMUIOutlineRenderer implements IAcceleratedRenderer<AcceleratedMUIOutlineRenderer.Context> {
+
+	public static final AcceleratedMUIOutlineRenderer INSTANCE = new AcceleratedMUIOutlineRenderer();
+
+	@Override
+	public void render(
+			VertexConsumer	vertexConsumer,
+			Context			context,
+			Matrix4f		transform,
+			Matrix3f		normal,
+			int				light,
+			int				overlay,
+			int				color
+	) {
+		var extension	= vertexConsumer	.getAccelerated	();
+		var glyph		= context			.glyph			();
+		var glyphX		= context			.glyphX			();
+		var glyphY		= context			.glyphY			();
+		var width		= context			.width			();
+		var height		= context			.height			();
+		var sBloat		= context			.sBloat			();
+
+		var uBloat = (glyph.u2 - glyph.u1) / (float) glyph.width;
+		var vBloat = (glyph.v2 - glyph.v1) / (float) glyph.height;
+
+		extension.beginTransform(transform, normal);
+
+		var red		= FastColor.ARGB32.red	(color) / 255.0F;
+		var green	= FastColor.ARGB32.green(color) / 255.0F;
+		var blue	= FastColor.ARGB32.blue	(color) / 255.0F;
+		var alpha	= FastColor.ARGB32.alpha(color) / 255.0F;
+
+		vertexConsumer.vertex(glyphX			- sBloat,	glyphY			- sBloat, 0.001F,	red, green, blue, alpha, glyph.u1 - uBloat, glyph.v1 - vBloat, overlay, light, 0.0F, 0.0F, 0.0F);
+		vertexConsumer.vertex(glyphX			- sBloat,	glyphY + height	+ sBloat, 0.001F,	red, green, blue, alpha, glyph.u1 - uBloat, glyph.v2 + vBloat, overlay, light, 0.0F, 0.0F, 0.0F);
+		vertexConsumer.vertex(glyphX + width	+ sBloat,	glyphY + height	+ sBloat, 0.0F,		red, green, blue, alpha, glyph.u2 + uBloat, glyph.v2 + vBloat, overlay, light, 0.0F, 0.0F, 0.0F);
+		vertexConsumer.vertex(glyphX + width	+ sBloat,	glyphY			- sBloat, 0.0F,		red, green, blue, alpha, glyph.u2 + uBloat, glyph.v1 - vBloat, overlay, light, 0.0F, 0.0F, 0.0F);
+
+		extension.endTransform();
+	}
+
+	public static Context context(
+			BakedGlyph		glyph,
+			float			glyphX,
+			float			glyphY,
+			float			width,
+			float			height,
+			float			sBloat
+	) {
+		return new Context(
+				glyph,
+				glyphX,
+				glyphY,
+				width,
+				height,
+				sBloat
+		);
+	}
+
+	public record Context(
+			BakedGlyph		glyph,
+			float			glyphX,
+			float			glyphY,
+			float			width,
+			float			height,
+			float			sBloat
+	) {
+
+	}
+}

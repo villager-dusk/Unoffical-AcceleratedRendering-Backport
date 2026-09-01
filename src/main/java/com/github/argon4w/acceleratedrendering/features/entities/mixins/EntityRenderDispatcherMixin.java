@@ -1,0 +1,81 @@
+package com.github.argon4w.acceleratedrendering.features.entities.mixins;
+
+import com.github.argon4w.acceleratedrendering.core.CoreFeature;
+import com.github.argon4w.acceleratedrendering.core.buffers.accelerated.builders.VertexConsumerExtension;
+import com.github.argon4w.acceleratedrendering.core.utils.CompatibilityMath;
+import com.github.argon4w.acceleratedrendering.features.entities.AcceleratedEntityRenderingFeature;
+import com.github.argon4w.acceleratedrendering.features.entities.AcceleratedEntityShadowRenderer;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
+import lombok.experimental.ExtensionMethod;
+import net.minecraft.client.renderer.LightTexture;
+import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import org.joml.Matrix3f;
+import org.joml.Matrix4f;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+
+@ExtensionMethod(VertexConsumerExtension.class)
+@Mixin			(
+		value		= EntityRenderDispatcher.class,
+		priority	= 999
+)
+public class EntityRenderDispatcherMixin {
+
+	@Unique private static final Matrix3f SHADOW_NORMAL_MATRIX = new Matrix3f().identity();
+	@Unique private static final Matrix4f SHADOW_TRANSFORM_MATRIX = new Matrix4f();
+
+	@Inject(
+			method		= "renderBlockShadow",
+			at			= @At("HEAD"),
+			cancellable	= true
+	)
+	private static void fastBlockShadow(
+			PoseStack.Pose	pPose,
+			VertexConsumer	pVertexConsumer,
+			LevelReader		pLevel,
+			BlockPos		pPos,
+			double			pX,
+			double			pY,
+			double			pZ,
+			float			pSize,
+			float			pWeight,
+			CallbackInfo	ci
+	) {
+		var extension = pVertexConsumer.getAccelerated();
+
+		if (		CoreFeature							.isLoaded						()
+				&&	CoreFeature							.isRenderingLevel				()
+				&&	AcceleratedEntityRenderingFeature	.isEnabled						()
+				&&	AcceleratedEntityRenderingFeature	.shouldUseAcceleratedPipeline	()
+				&&	extension							.isAccelerated					()
+		) {
+			ci			.cancel		();
+			extension.doRender(
+					AcceleratedEntityShadowRenderer.INSTANCE,
+					AcceleratedEntityShadowRenderer.context(
+							pLevel,
+							pLevel.getChunk(pPos),
+							pPos,
+							(float) pX,
+							(float) pY,
+							(float) pZ,
+							pSize,
+							pWeight
+					),
+					CompatibilityMath.toJoml(pPose.pose(), SHADOW_TRANSFORM_MATRIX),
+					SHADOW_NORMAL_MATRIX,
+					LightTexture.FULL_BRIGHT,
+					OverlayTexture.NO_OVERLAY,
+					-1
+			);
+		}
+	}
+}

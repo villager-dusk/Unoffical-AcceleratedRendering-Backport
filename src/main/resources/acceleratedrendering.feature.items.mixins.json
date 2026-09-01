@@ -1,0 +1,29 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.github.argon4w.acceleratedrendering.features.items.mixins",
+  "compatibilityLevel": "JAVA_17",
+  "client": [
+    "accessors.BlockColorsAccessor",
+    "accessors.ItemColorsAccessor",
+    "compatibility.ClientHooksMixin",
+    "compatibility.ForgeGuiMixin",
+    "gui.AbstractContainerScreenMixin",
+    "gui.FontMixin",
+    "gui.GuiGraphicsMixin",
+    "gui.GuiMixin",
+    "models.BakedCompositeModelMixin",
+    "models.BakedModelMixin",
+    "models.BakedQuadMixin",
+    "models.BakedSeparateTransformsModelMixin",
+    "models.MultipartBakedModelMixin",
+    "models.SimpleBakedModelMixin",
+    "models.WeightedBakedModelMixin",
+    "ItemRendererMixin",
+    "ModelBlockRendererMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "refmap": "acceleratedrendering.refmap.json"
+}
